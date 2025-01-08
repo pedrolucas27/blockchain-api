@@ -37,6 +37,6 @@ cargo run
 
 ## 🧑‍💻 Contribuidores
 
-- Alisson Diogo de Soares de Souza
+- Alisson Diogo Soares de Souza
 - Pedro Lucas Farias Figueiredo de Medeiros
 - Victor Gabriel Oliveira do Couto
