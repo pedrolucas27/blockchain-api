@@ -1,0 +1,26 @@
+# Get the current blockchain
+GET http://localhost:8080/chain
+
+###
+
+# Mine a new block
+POST http://localhost:8080/mine
+Content-Type: application/json
+
+###
+
+# Create a new transaction
+POST http://localhost:8080/transactions/create
+Content-Type: application/json
+
+{
+  "sender": "string",
+  "recipient": "string",
+  "amount": 0.0,
+  "priv_wif_key": "string"
+}
+
+###
+
+# Get the current mempool
+GET http://localhost:8080/transactions/mempool
