@@ -1,6 +1,6 @@
 use serde::Serialize;
 use serde_json::{self, Value};
-use sha2::{Digest, Sha256}; 
+use sha2::{Digest, Sha256};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, Serialize)]
@@ -15,12 +15,37 @@ pub struct Block {
 
 pub struct Blockchain {
     pub chain: Vec<Block>,
-    pub mempool: Vec<String>, 
+    pub mempool: Vec<String>,
 }
 
 const DIFFICULTY: usize = 4;
 
 impl Blockchain {
+    pub fn new() -> Self {
+        //construtor
+        let mut initial_blockchain = Blockchain {
+            chain: Vec::new(),
+            mempool: Vec::new(),
+        };
+
+        initial_blockchain.create_genesis_block();
+
+        initial_blockchain
+    }
+
+    fn create_genesis_block(&mut self) -> Block {
+        // Usado apenas no construtor. Cria, minera e retorna o bloco gênesis do blockchain
+        let genesis_block = self.create_block();
+
+        if let Some(last_block) = self.chain.last_mut() { 
+            Self::mine_proof_of_work(last_block);
+        } else {
+            println!("A chain está vazia!");
+        }
+
+        genesis_block
+    }
+
     pub fn create_block(&mut self) -> Block {
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -59,6 +84,7 @@ impl Blockchain {
     }
 
     pub fn get_block_id(block: &Block) -> String {
+        // Retorna o ID do bloco passado como argumento. O ID de um bloco é o hash do seu cabeçalho
         let mut block_copy =
             serde_json::to_value(block).expect("Erro ao converter bloco para JSON");
         if let Value::Object(ref mut map) = block_copy {
@@ -83,7 +109,7 @@ impl Blockchain {
         block_id.chars().take(DIFFICULTY).all(|c| c == '0')
     }
 
-    pub fn mine_proof_of_work(&self, block: &mut Block) -> u64{
+    pub fn mine_proof_of_work(block: &mut Block) -> u64 {
         // Retorna um nonce válido para o bloco passado
         let mut nonce: u64 = 0;
         while Self::is_valid_proof(block, nonce) == false {

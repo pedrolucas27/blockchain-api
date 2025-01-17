@@ -8,10 +8,7 @@ pub struct BlockchainService {
 impl BlockchainService {
     pub fn new() -> Self {
         Self {
-            blockchain: Mutex::new(Blockchain {
-                chain: vec![],
-                mempool: vec![], 
-            }),
+            blockchain: Mutex::new(Blockchain::new()),
         }
     }
 
