@@ -10,8 +10,7 @@ impl BlockchainService {
         Self {
             blockchain: Mutex::new(Blockchain {
                 chain: vec![],
-                mempool: vec![],
-                nodes: Default::default(),
+                mempool: vec![], 
             }),
         }
     }

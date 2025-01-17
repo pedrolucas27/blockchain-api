@@ -1,7 +1,6 @@
 use serde::Serialize;
 use serde_json::{self, Value};
-use sha2::{Digest, Sha256};
-use std::collections::HashSet;
+use sha2::{Digest, Sha256}; 
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, Serialize)]
@@ -16,8 +15,7 @@ pub struct Block {
 
 pub struct Blockchain {
     pub chain: Vec<Block>,
-    pub mempool: Vec<String>,
-    pub nodes: HashSet<String>,
+    pub mempool: Vec<String>, 
 }
 
 const DIFFICULTY: usize = 4;
