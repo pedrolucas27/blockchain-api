@@ -1,12 +1,15 @@
 use bitcoin::hashes::Hash;
 use bitcoin::key::PrivateKey;
-use serde::Serialize;
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
 use serde_json::{self, Value};
 use sha2::{Digest, Sha256};
+use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH}; 
-use bitcoin::secp256k1::{ecdsa::Signature, Message, Secp256k1};
+use bitcoin::secp256k1::{ecdsa::Signature, Message, Secp256k1, PublicKey};
+use hex;
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Block {
     pub index: usize,
     pub timestamp: u64,
@@ -21,7 +24,7 @@ pub struct Blockchain {
     pub mempool: Vec<Transaction>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Transaction {
     sender: String,
     recipient: String,
@@ -218,4 +221,103 @@ impl Blockchain {
 
         Ok(signature)
     }
+
+    // TODO: revisar biblioteca tokio, client
+    pub async  fn resolve_conflicts(&mut self, nodes: Vec<String>) -> Result<(), reqwest::Error> {
+        let client = Client::new();
+        let mut candidate_chain: Vec<Block> = Vec::new();
+        
+        for api_url in nodes {
+            let incoming_chain: Vec<Block> = client.get(&format!("{}/chain", api_url)).send().await?.json().await?;
+            let is_bigger_than_current_chain = incoming_chain.len() > self.chain.len();
+            let is_bigger_than_candidate_chain = incoming_chain.len() > candidate_chain.len();
+            let is_valid_chain = self.is_valid_chain(&incoming_chain);
+
+            if is_bigger_than_current_chain && is_valid_chain && is_bigger_than_candidate_chain {
+                candidate_chain = incoming_chain;
+            }
+        }
+
+        if !candidate_chain.is_empty() {
+            self.chain = candidate_chain;
+        }
+
+        Ok(())
+    }
+
+    pub fn is_valid_chain(&self, chain: &Vec<Block>) -> bool {
+        for i in (0..chain.len()).rev() {
+            let block = &chain[i];
+            let previous_block = if i > 0 { &chain[i - 1] } else { block };
+            let is_genesis = i == 0;
+            let mut valid_transaction = true;
+
+            let mut modified_block = block.clone();
+            if !Self::is_valid_proof(&mut modified_block, block.nonce) {
+                return false;
+            }
+
+            for transaction in &block.transactions {
+                let mut transaction_copy = transaction.clone();
+                let signature = transaction_copy.signature.take();
+
+                if let Some(signature) = signature {
+                    let message = serde_json::to_string(&transaction_copy).unwrap();
+                    if !Self::verify_signature(&transaction.sender, &signature, &message) {
+                        valid_transaction = false;
+                    }
+                } else {
+                    valid_transaction = false;
+                }
+            }
+
+            if !valid_transaction {
+                return false;
+            }
+
+            if self.generate_merkle_root(&block.transactions) != block.merkle_root {
+                return false;
+            }
+
+            if !self.verify_is_valid_previous_hash(block, previous_block, is_genesis) {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    pub fn verify_signature(address: &str, signature: &str, message: &str) -> bool {
+        let secp = Secp256k1::verification_only();
+        let public_key = match PublicKey::from_slice(&hex::decode(address).unwrap_or_default()) {
+            Ok(pk) => pk,
+            Err(_) => return false,
+        };
+
+        let signature = match Signature::from_str(signature) {
+            Ok(sig) => sig,
+            Err(_) => return false,
+        };
+
+        let message_hash = bitcoin::hashes::sha256::Hash::hash(message.as_bytes());
+        let message = match Message::from_digest_slice(message_hash.as_ref()) {
+            Ok(msg) => msg,
+            Err(_) => return false,
+        };
+        
+        secp.verify_ecdsa(&message, &signature, &public_key).is_ok()
+    }
+
+    pub fn verify_is_valid_previous_hash(&self, block: &Block, previous_block: &Block, is_genesis: bool) -> bool {
+        if is_genesis && block.previous_hash == "0".repeat(64) {
+            return true;
+        }
+
+        if block.previous_hash == Self::get_block_id(previous_block) {
+            return true;
+        }
+
+        false
+    }
+
 }
