@@ -5,13 +5,8 @@ mod models;
 mod routes;
 mod services;
 
-// #[actix_web::main]
-fn main() {
-    // println!("Iniciando a API...");
-    // HttpServer::new(|| App::new().configure(routes::blockchain_routes::init_routes))
-    //     .bind("localhost:8080")?
-    //     .run()
-    //     .await
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
     let mut blockchain = Blockchain::new();
 
     println!("Block genesis: {:#?}", blockchain.chain.first());
@@ -47,4 +42,21 @@ fn main() {
     Blockchain::mine_proof_of_work(&mut new_block);
     println!("Novo bloco criado de novo: {:#?}", new_block);
 
+    // ##############################################################################################
+
+    println!("Iniciando a API...");
+
+    let wif_key = "L1US57sChKZeyXrev9q7tFm2dgA2ktJe2NP3xzXRv6wizom5MN1U";
+    let message = "Mensagem para assinar";
+
+    let blockchain_service = BlockchainService::new(pool.clone());
+
+    HttpServer::new(move || {
+        App::new()
+            .app_data(web::Data::new(blockchain_service.clone()))
+            .configure(routes::blockchain_routes::init_routes)
+    })
+    .bind("localhost:8080")?
+    .run()
+    .await
 }
