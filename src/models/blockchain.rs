@@ -19,6 +19,7 @@ pub struct Block {
     pub previous_hash: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Blockchain {
     pub chain: Vec<Block>,
     pub mempool: Vec<Transaction>,
@@ -26,10 +27,10 @@ pub struct Blockchain {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Transaction {
-    sender: String,
-    recipient: String,
-    amount: u64,
-    timestamp: String,
+    pub sender: String,
+    pub recipient: String,
+    pub amount: u64,
+    pub timestamp: String,
     pub signature: Option<String>, // Por causa de problemas com o derive Serialize no Signature
                                    // signature: Option<Result<Signature, std::string::String>>,
 }
@@ -168,22 +169,9 @@ impl Blockchain {
 
     pub fn create_transaction(
         &mut self,
-        sender: &str,
-        recipient: &str,
-        amount: u64,
-        timestamp: &str,
+        transaction: &mut Transaction,
         priv_wif_key: &str,
     ) -> Transaction {
-        // Cria, insere no mempool e retorna uma nova transação, assinada pela chave privada WIF do remetente.
-
-        let mut transaction = Transaction {
-            sender: sender.to_string(),
-            recipient: recipient.to_string(),
-            amount,
-            timestamp: timestamp.to_string(),
-            signature: None,
-        };
-
         // A message enviada é o cabeçalho da transação, sem o signature
         let tx_data =
             serde_json::to_string(&transaction).expect("Erro ao serializar a transação para JSON");
@@ -193,11 +181,9 @@ impl Blockchain {
             transaction.signature = Some(signature.to_string());
         }
 
-        // transaction.signature = Some(Blockchain::sign(priv_wif_key, "message"));
-
         self.mempool.push(transaction.clone());
 
-        transaction
+        transaction.clone()
     }
 
     pub fn sign(wif_compressed_priv_key: &str, message: &str) -> Result<Signature, String> {

@@ -1,93 +1,92 @@
-use crate::models::blockchain::{Blockchain, Transaction};
+use crate::models::blockchain::{Block, Blockchain, Transaction};
 use r2d2::Pool;
 use r2d2_redis::redis::{Commands, RedisError};
 use r2d2_redis::RedisConnectionManager;
 
+#[derive(Clone)]
 pub struct BlockchainService {
     pool: Pool<RedisConnectionManager>,
-    current_blockchain: Blockchain,
+    pub current_blockchain: Blockchain,
 }
 
 impl BlockchainService {
     pub fn new(pool: Pool<RedisConnectionManager>) -> Self {
-        BlockchainService {
+        let mut service = BlockchainService {
             pool,
             current_blockchain: Blockchain::new(),
-        }
+        };
 
-        //Self::init_genesis_block(&Self);
+        let _ = service.start_blockchain();
+
+        service
     }
 
-    pub fn init_genesis_block(&self) -> Result<(), RedisError> {
-        let mut conn = self.pool.get()?;
+    pub fn start_blockchain(&mut self) -> Result<(), RedisError> {
+        let mut conn = self
+            .pool
+            .get()
+            .expect("Falha ao tentar obter conexão com redis:");
 
-        let chain_length: i64 = conn.llen("chain")?;
-        let genesis = self.current_blockchain.create_block();
+        let exists: bool = conn.exists("blockchain")?;
 
-        if chain_length != 0 {
-            let block_last = conn.lrange("chain", -1, -1);
-            let json_block_serialized = serde_json::from_str(block_last);
+        if exists {
+            let serialized_blockchain: String = conn
+                .get("blockchain")
+                .expect("Erro ao tentar recuperar blockchain");
 
-            self.current_blockchain
-                .mine_proof_of_work(json_block_serialized);
+            self.current_blockchain = serde_json::from_str(&serialized_blockchain)
+                .expect("Erro ao converter blockchain para json");
         } else {
-            self.save_block(block)
+            self.persist_db();
         }
 
         Ok(())
     }
 
-    pub fn save_block(&self, block: &Block) -> Result<(), RedisError> {
-        let mut conn = self.pool.get()?;
+    pub fn mine(&mut self) -> Result<Block, RedisError> {
+        let mut new_block = self.current_blockchain.create_block();
 
-        let serialized = serde_json::to_string(block).expect("Erro ao converter bloco para String");
+        Blockchain::mine_proof_of_work(&mut new_block);
 
-        println!(serialized);
+        self.persist_db();
 
-        conn.rpush("chain", block.clone());
-        Ok(())
+        Ok(new_block)
     }
 
-    pub fn save_transaction(&self, transaction: &Transaction) -> Result<(), RedisError> {
-        let mut conn = self.pool.get()?;
+    pub fn save_transaction(
+        &mut self,
+        transaction: &mut Transaction,
+        priv_wif_key: &str,
+    ) -> Result<Transaction, RedisError> {
+        let mut conn = self
+            .pool
+            .get()
+            .expect("Falha ao tentar obter conexão com redis:");
 
-        let serialized = serde_json::to_string(transaction)
-            .expect("Erro ao converter serializar a transação para String");
+        let serialized_blockchain: String = conn
+            .get("blockchain")
+            .expect("Erro ao tentar recuperar blockchain");
 
-        if let Ok(signature) = Blockchain::sign(priv_wif_key, &tx_data) {
-            // Converte a assinatura para uma string hexadecimal, por causa do derive serialize
-            transaction.signature = Some(signature.to_string());
-        }
+        self.current_blockchain = serde_json::from_str(&serialized_blockchain)
+            .expect("Erro ao converter blockchain para json");
 
-        println!(serialized);
+        let new_transaction = self
+            .current_blockchain
+            .create_transaction(transaction, priv_wif_key);
 
-        conn.rpush("chain", transaction.clone());
-        Ok(())
+        self.persist_db();
+
+        Ok(new_transaction)
     }
 
-    pub fn get_mempool(&self) -> Result<Vec<Transaction>, RedisError> {
-        let mut conn = self.pool.get()?;
+    fn persist_db(&self) {
+        let mut conn = self
+            .pool
+            .get()
+            .expect("Falha ao tentar obter conexão com redis:");
 
-        let mempool: Vec<Transaction> = conn
-            .lrange("mempool", 0, -1)?
-            .into_iter()
-            .map(|tx_str| serde_json::from_str(&tx_str).expect("Erro ao desserializar transação"))
-            .collect();
-
-        Ok(mempool)
-    }
-
-    pub fn get_chain(&self) -> Result<Vec<Block>, RedisError> {
-        let mut conn = self.pool.get()?;
-
-        let chain: Vec<Block> = conn
-            .lrange("chain", 0, -1)?
-            .into_iter()
-            .map(|block_str| {
-                serde_json::from_str(&block_str).expect("Erro ao desserializar o bloco")
-            })
-            .collect();
-
-        Ok(chain)
+        let serialized_blockchain = serde_json::to_string(&self.current_blockchain).unwrap();
+        conn.set::<&str, String, ()>("blockchain", serialized_blockchain)
+            .unwrap();
     }
 }

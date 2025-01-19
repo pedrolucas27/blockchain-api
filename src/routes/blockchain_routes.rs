@@ -1,43 +1,53 @@
-use actix_web::{get, post, web, HttpResponse, Responder};
-use r2d2::Pool;
-use r2d2_redis::{redis::Commands, RedisConnectionManager};
-use serde_json;
+use std::sync::Mutex;
 
-use crate::{models::blockchain::Block, services::blockchain_service::BlockchainService};
+use crate::{
+    models::blockchain::{Block, Transaction},
+    services::blockchain_service::BlockchainService,
+};
+use actix_web::{get, post, web, HttpResponse, Responder};
 
 #[get("/chain")]
-async fn get_chain(service: web::Data<BlockchainService>) -> impl Responder {
-    let chain = service.get_chain();
+async fn get_chain(service: web::Data<Mutex<BlockchainService>>) -> impl Responder {
+    println!("Processando chain...");
+
+    let service = service.lock().unwrap();
+    let chain: Vec<Block> = service.current_blockchain.chain.clone();
     HttpResponse::Ok().json(chain)
 }
 
 #[post("/mine")]
-async fn mine_block(service: web::Data<BlockchainService>) -> impl Responder {
-    let new_block = service.init_genesis_block();
-    HttpResponse::Ok().json(new_block)
+async fn mine_block(service: web::Data<Mutex<BlockchainService>>) -> impl Responder {
+    let mut service = service.lock().unwrap();
+    match service.mine() {
+        Ok(new_block) => HttpResponse::Ok().json(new_block),
+        Err(err) => {
+            HttpResponse::InternalServerError().json(format!("Error mining block: {}", err))
+        }
+    }
 }
 
 #[get("/transactions/mempool")]
-async fn mempool(service: web::Data<BlockchainService>) -> impl Responder {
-    let mempool: Vec<Transaction> = service.get_mempool();
-    HttpResponse::Ok().body(mempool)
+async fn mempool(service: web::Data<Mutex<BlockchainService>>) -> impl Responder {
+    let service = service.lock().unwrap();
+    let mempool: Vec<Transaction> = service.current_blockchain.mempool.clone();
+    HttpResponse::Ok().json(mempool)
 }
 
 #[post("/transactions/create")]
 async fn create_transaction(
-    item: web::Json<(String, String, f64, String)>,
-    service: web::Data<BlockchainService>,
+    item: web::Json<Transaction>,
+    service: web::Data<Mutex<BlockchainService>>,
 ) -> impl Responder {
-    let mut request = Transaction {
-        sender: item.0.clone().to_string(),
-        recipient: item.1.clone().to_string(),
-        amount: item.2,
-        timestamp: item.3.clone().to_string(),
-        signature: None,
-    };
+    let mut new_transaction = item.into_inner();
+    let wif_key = "L1US57sChKZeyXrev9q7tFm2dgA2ktJe2NP3xzXRv6wizom5MN1U";
 
-    let transaction = service.save_transaction(request);
-    HttpResponse::Ok().json(transaction)
+    let mut service = service.lock().unwrap();
+    match service.save_transaction(&mut new_transaction, wif_key) {
+        Ok(transaction) => HttpResponse::Ok().json(transaction),
+        Err(err) => {
+            HttpResponse::InternalServerError().json(format!("Error saving transaction: {}", err))
+        }
+    }
 }
 
 pub fn init_routes(cfg: &mut web::ServiceConfig) {
