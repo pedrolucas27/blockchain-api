@@ -44,13 +44,18 @@ impl BlockchainService {
     }
 
     pub fn mine(&mut self) -> Result<Block, RedisError> {
-        let mut new_block = self.current_blockchain.create_block();
+        self.current_blockchain.create_block();
 
-        Blockchain::mine_proof_of_work(&mut new_block);
+        self.current_blockchain.mine_proof_of_work();
 
         self.persist_db();
 
-        Ok(new_block)
+        if let Some(last_block) = self.current_blockchain.chain.last() { 
+            Ok(last_block.clone())
+        } else {
+            Err(std::io::Error::new(std::io::ErrorKind::Other, "Blockchain vazia").into())
+
+        } 
     }
 
     pub fn save_transaction(

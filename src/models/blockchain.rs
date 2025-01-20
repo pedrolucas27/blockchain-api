@@ -53,12 +53,7 @@ impl Blockchain {
     fn create_genesis_block(&mut self) -> Block {
         // Usado apenas no construtor. Cria, minera e retorna o bloco gênesis do blockchain
         let genesis_block = self.create_block();
-
-        if let Some(last_block) = self.chain.last_mut() {
-            Self::mine_proof_of_work(last_block);
-        } else {
-            println!("A chain está vazia!");
-        }
+        self.mine_proof_of_work();
 
         genesis_block
     }
@@ -158,13 +153,23 @@ impl Blockchain {
         block_id.chars().take(DIFFICULTY).all(|c| c == '0')
     }
 
-    pub fn mine_proof_of_work(block: &mut Block) -> u64 {
+    pub fn mine_proof_of_work(&mut self) -> u64 {
         // Retorna um nonce válido para o bloco passado
-        let mut nonce: u64 = 0;
-        while Self::is_valid_proof(block, nonce) == false {
-            nonce += 1;
+        let last_block_d = self.chain.pop();
+        match last_block_d {
+            Some(mut block) => {
+                let mut nonce: u64 = 0;
+                while Self::is_valid_proof(&mut block, nonce) == false {
+                    nonce += 1;
+                }
+                self.chain.push(block);
+                nonce
+            }
+            None => {
+                println!("A chain está vazia");
+                return 0;
+            }
         }
-        nonce
     }
 
     pub fn create_transaction(

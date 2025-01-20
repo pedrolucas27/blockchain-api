@@ -1,10 +1,10 @@
 use std::sync::Mutex;
 
 use env_logger;
-use log::{debug, error, info, warn};
+use log::info;
 
 use actix_web::{web, App, HttpServer};
-use r2d2_redis::{redis::Commands, RedisConnectionManager};
+use r2d2_redis::RedisConnectionManager;
 use services::blockchain_service::BlockchainService;
 
 mod models;
