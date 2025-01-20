@@ -1,13 +1,13 @@
 use bitcoin::hashes::Hash;
 use bitcoin::key::PrivateKey;
+use bitcoin::secp256k1::{ecdsa::Signature, Message, PublicKey, Secp256k1};
+use hex;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{self, Value};
 use sha2::{Digest, Sha256};
 use std::str::FromStr;
-use std::time::{SystemTime, UNIX_EPOCH}; 
-use bitcoin::secp256k1::{ecdsa::Signature, Message, Secp256k1, PublicKey};
-use hex;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Block {
@@ -223,15 +223,20 @@ impl Blockchain {
     }
 
     // TODO: revisar biblioteca tokio, client
-    pub async  fn resolve_conflicts(&mut self, nodes: Vec<String>) -> Result<(), reqwest::Error> {
+    pub async fn _resolve_conflicts(&mut self, nodes: Vec<String>) -> Result<(), reqwest::Error> {
         let client = Client::new();
         let mut candidate_chain: Vec<Block> = Vec::new();
-        
+
         for api_url in nodes {
-            let incoming_chain: Vec<Block> = client.get(&format!("{}/chain", api_url)).send().await?.json().await?;
+            let incoming_chain: Vec<Block> = client
+                .get(&format!("{}/chain", api_url))
+                .send()
+                .await?
+                .json()
+                .await?;
             let is_bigger_than_current_chain = incoming_chain.len() > self.chain.len();
             let is_bigger_than_candidate_chain = incoming_chain.len() > candidate_chain.len();
-            let is_valid_chain = self.is_valid_chain(&incoming_chain);
+            let is_valid_chain = self._is_valid_chain(&incoming_chain);
 
             if is_bigger_than_current_chain && is_valid_chain && is_bigger_than_candidate_chain {
                 candidate_chain = incoming_chain;
@@ -245,7 +250,7 @@ impl Blockchain {
         Ok(())
     }
 
-    pub fn is_valid_chain(&self, chain: &Vec<Block>) -> bool {
+    pub fn _is_valid_chain(&self, chain: &Vec<Block>) -> bool {
         for i in (0..chain.len()).rev() {
             let block = &chain[i];
             let previous_block = if i > 0 { &chain[i - 1] } else { block };
@@ -263,7 +268,7 @@ impl Blockchain {
 
                 if let Some(signature) = signature {
                     let message = serde_json::to_string(&transaction_copy).unwrap();
-                    if !Self::verify_signature(&transaction.sender, &signature, &message) {
+                    if !Self::_verify_signature(&transaction.sender, &signature, &message) {
                         valid_transaction = false;
                     }
                 } else {
@@ -279,7 +284,7 @@ impl Blockchain {
                 return false;
             }
 
-            if !self.verify_is_valid_previous_hash(block, previous_block, is_genesis) {
+            if !self._verify_is_valid_previous_hash(block, previous_block, is_genesis) {
                 return false;
             }
         }
@@ -287,7 +292,7 @@ impl Blockchain {
         true
     }
 
-    pub fn verify_signature(address: &str, signature: &str, message: &str) -> bool {
+    pub fn _verify_signature(address: &str, signature: &str, message: &str) -> bool {
         let secp = Secp256k1::verification_only();
         let public_key = match PublicKey::from_slice(&hex::decode(address).unwrap_or_default()) {
             Ok(pk) => pk,
@@ -304,11 +309,16 @@ impl Blockchain {
             Ok(msg) => msg,
             Err(_) => return false,
         };
-        
+
         secp.verify_ecdsa(&message, &signature, &public_key).is_ok()
     }
 
-    pub fn verify_is_valid_previous_hash(&self, block: &Block, previous_block: &Block, is_genesis: bool) -> bool {
+    pub fn _verify_is_valid_previous_hash(
+        &self,
+        block: &Block,
+        previous_block: &Block,
+        is_genesis: bool,
+    ) -> bool {
         if is_genesis && block.previous_hash == "0".repeat(64) {
             return true;
         }
@@ -319,5 +329,4 @@ impl Blockchain {
 
         false
     }
-
 }
