@@ -1,7 +1,7 @@
 use std::sync::Mutex;
 
 use crate::{
-    models::blockchain::{Block, Transaction},
+    models::blockchain::{Block, Transaction, TransactionRequest},
     services::blockchain_service::BlockchainService,
 };
 use actix_web::{get, post, web, HttpResponse, Responder};
@@ -38,14 +38,13 @@ async fn mempool(service: web::Data<Mutex<BlockchainService>>) -> impl Responder
 
 #[post("/transactions/create")]
 async fn create_transaction(
-    item: web::Json<Transaction>,
+    item: web::Json<TransactionRequest>,
     service: web::Data<Mutex<BlockchainService>>,
 ) -> impl Responder {
-    let mut new_transaction = item.into_inner();
-    let wif_key = "L1US57sChKZeyXrev9q7tFm2dgA2ktJe2NP3xzXRv6wizom5MN1U";
+    let transaction_request = item.into_inner();
 
     let mut service = service.lock().unwrap();
-    match service.save_transaction(&mut new_transaction, wif_key) {
+    match service.save_transaction(transaction_request) {
         Ok(transaction) => HttpResponse::Ok().json(transaction),
         Err(err) => {
             HttpResponse::InternalServerError().json(format!("Error saving transaction: {}", err))

@@ -1,4 +1,4 @@
-use crate::models::blockchain::{Block, Blockchain, Transaction};
+use crate::models::blockchain::{Block, Blockchain, Transaction, TransactionRequest};
 use r2d2::Pool;
 use r2d2_redis::redis::{Commands, RedisError};
 use r2d2_redis::RedisConnectionManager;
@@ -73,14 +73,21 @@ impl BlockchainService {
 
     pub fn save_transaction(
         &mut self,
-        transaction: &mut Transaction,
-        priv_wif_key: &str,
+        transaction_request: TransactionRequest,
     ) -> Result<Transaction, RedisError> {
         self.update_current_blockchain();
 
+        let mut transaction = Transaction {
+            sender: transaction_request.sender,
+            recipient: transaction_request.recipient,
+            signature: None,
+            timestamp: transaction_request.timestamp,
+            amount: transaction_request.amount,
+        };
+
         let new_transaction = self
             .current_blockchain
-            .create_transaction(transaction, priv_wif_key); 
+            .create_transaction(&mut transaction, &transaction_request.priv_wif_key);
         self.persist_db();
 
         Ok(new_transaction)

@@ -31,8 +31,16 @@ pub struct Transaction {
     pub recipient: String,
     pub amount: u64,
     pub timestamp: String,
-    pub signature: Option<String>, // Por causa de problemas com o derive Serialize no Signature
-                                   // signature: Option<Result<Signature, std::string::String>>,
+    pub signature: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TransactionRequest {
+    pub sender: String,
+    pub recipient: String,
+    pub amount: u64,
+    pub timestamp: String,
+    pub priv_wif_key: String,
 }
 
 const DIFFICULTY: usize = 4;
