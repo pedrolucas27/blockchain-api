@@ -21,12 +21,7 @@ async fn main() -> std::io::Result<()> {
         RedisConnectionManager::new("redis://localhost:6379").expect("Failed to create manager");
     let pool = r2d2::Pool::builder().build(manager).unwrap();
 
-    /*
-        let mut conn = pool.get().expect("Falha ao obter conexão com o Redis");
-        let _: () = conn.set("test_key", 42).unwrap(); // Armazenando uma chave para testar
-        let _: i32 = conn.get("test_key").unwrap(); // Tentando pegar a chave, se conseguir, Redis está OK
-    */
-    println!("Conexão com o Redis bem-sucedida!");
+    info!("Conexão com o Redis bem-sucedida!");
 
     let blockchain_service = BlockchainService::new(pool);
 
