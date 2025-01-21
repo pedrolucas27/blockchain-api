@@ -24,3 +24,10 @@ Content-Type: application/json
 
 # Get the current mempool
 GET http://localhost:8080/transactions/mempool
+
+###
+
+POST http://localhost:8080/insert/block
+Content-Type: application/json
+
+

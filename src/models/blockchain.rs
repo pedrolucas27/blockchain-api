@@ -19,6 +19,7 @@ pub struct Block {
     pub previous_hash: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Blockchain {
     pub chain: Vec<Block>,
     pub mempool: Vec<Transaction>,
@@ -26,12 +27,20 @@ pub struct Blockchain {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Transaction {
-    sender: String,
-    recipient: String,
-    amount: u64,
-    timestamp: String,
-    signature: Option<String>, // Por causa de problemas com o derive Serialize no Signature
-                               // signature: Option<Result<Signature, std::string::String>>,
+    pub sender: String,
+    pub recipient: String,
+    pub amount: u64,
+    pub timestamp: String,
+    pub signature: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TransactionRequest {
+    pub sender: String,
+    pub recipient: String,
+    pub amount: u64,
+    pub timestamp: String,
+    pub priv_wif_key: String,
 }
 
 const DIFFICULTY: usize = 4;
@@ -52,12 +61,7 @@ impl Blockchain {
     fn create_genesis_block(&mut self) -> Block {
         // Usado apenas no construtor. Cria, minera e retorna o bloco gênesis do blockchain
         let genesis_block = self.create_block();
-
-        if let Some(last_block) = self.chain.last_mut() {
-            Self::mine_proof_of_work(last_block);
-        } else {
-            println!("A chain está vazia!");
-        }
+        self.mine_proof_of_work();
 
         genesis_block
     }
@@ -157,33 +161,30 @@ impl Blockchain {
         block_id.chars().take(DIFFICULTY).all(|c| c == '0')
     }
 
-    pub fn mine_proof_of_work(block: &mut Block) -> u64 {
+    pub fn mine_proof_of_work(&mut self) -> u64 {
         // Retorna um nonce válido para o bloco passado
-        let mut nonce: u64 = 0;
-        while Self::is_valid_proof(block, nonce) == false {
-            nonce += 1;
+        let last_block_d = self.chain.pop();
+        match last_block_d {
+            Some(mut block) => {
+                let mut nonce: u64 = 0;
+                while Self::is_valid_proof(&mut block, nonce) == false {
+                    nonce += 1;
+                }
+                self.chain.push(block);
+                nonce
+            }
+            None => {
+                println!("A chain está vazia");
+                return 0;
+            }
         }
-        nonce
     }
 
     pub fn create_transaction(
         &mut self,
-        sender: &str,
-        recipient: &str,
-        amount: u64,
-        timestamp: &str,
+        transaction: &mut Transaction,
         priv_wif_key: &str,
     ) -> Transaction {
-        // Cria, insere no mempool e retorna uma nova transação, assinada pela chave privada WIF do remetente.
-
-        let mut transaction = Transaction {
-            sender: sender.to_string(),
-            recipient: recipient.to_string(),
-            amount,
-            timestamp: timestamp.to_string(),
-            signature: None,
-        };
-
         // A message enviada é o cabeçalho da transação, sem o signature
         let tx_data =
             serde_json::to_string(&transaction).expect("Erro ao serializar a transação para JSON");
@@ -193,11 +194,9 @@ impl Blockchain {
             transaction.signature = Some(signature.to_string());
         }
 
-        // transaction.signature = Some(Blockchain::sign(priv_wif_key, "message"));
-
         self.mempool.push(transaction.clone());
 
-        transaction
+        transaction.clone()
     }
 
     pub fn sign(wif_compressed_priv_key: &str, message: &str) -> Result<Signature, String> {

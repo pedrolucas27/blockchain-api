@@ -1,50 +1,36 @@
-use actix_web::{App, HttpServer};
-use models::blockchain::Blockchain;
+use std::sync::Mutex;
+
+use env_logger;
+use log::info;
+
+use actix_web::{web, App, HttpServer};
+use r2d2_redis::RedisConnectionManager;
+use services::blockchain_service::BlockchainService;
 
 mod models;
 mod routes;
 mod services;
 
-// #[actix_web::main]
-fn main() {
-    // println!("Iniciando a API...");
-    // HttpServer::new(|| App::new().configure(routes::blockchain_routes::init_routes))
-    //     .bind("localhost:8080")?
-    //     .run()
-    //     .await
-    let mut blockchain = Blockchain::new();
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    env_logger::init();
 
-    println!("Block genesis: {:#?}", blockchain.chain.first());
+    info!("Iniciando a API...");
 
-    let new_block = blockchain.create_block();
-    println!("Novo bloco criado: {:#?}", new_block);
+    let manager =
+        RedisConnectionManager::new("redis://localhost:6379").expect("Failed to create manager");
+    let pool = r2d2::Pool::builder().build(manager).unwrap();
 
-    let hash = Blockchain::generate_hash("dados para hash");
-    println!("Hash gerada: {}", hash);
+    info!("Conexão com o Redis bem-sucedida!");
 
-    let block_hash = Blockchain::get_block_id(&new_block);
-    println!("Hash do bloco: {}", block_hash);
+    let blockchain_service = BlockchainService::new(pool);
 
-    let wif_key = "L1US57sChKZeyXrev9q7tFm2dgA2ktJe2NP3xzXRv6wizom5MN1U";
-    let message = "Mensagem para assinar";
-
-    match Blockchain::sign(wif_key, message) {
-        Ok(signature) => println!("Assinatura gerada: {:?}", signature),
-        Err(e) => println!("Erro ao assinar: {}", e),
-    }
-
-    let transaction = blockchain.create_transaction(
-        "19sXoSbfcQD9K66f5hwP5vLwsaRyKLPgXF",
-        "1MxTkeEP2PmHSMze5tUZ1hAV3YTKu2Gh1N",
-        100,
-        "123123123",
-        "L1US57sChKZeyXrev9q7tFm2dgA2ktJe2NP3xzXRv6wizom5MN1U",
-    );
-
-    println!("transação: {:#?}", transaction);
-
-    let mut new_block = blockchain.create_block();
-    Blockchain::mine_proof_of_work(&mut new_block);
-    println!("Novo bloco criado de novo: {:#?}", new_block);
-
+    HttpServer::new(move || {
+        App::new()
+            .app_data(web::Data::new(Mutex::new(blockchain_service.clone())))
+            .configure(routes::blockchain_routes::init_routes)
+    })
+    .bind("localhost:8080")?
+    .run()
+    .await
 }

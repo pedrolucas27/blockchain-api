@@ -12,3 +12,10 @@ sha2 = "0.10.8"
 hex = "0.4"
 reqwest = { version = "0.11", features = ["json"] }
 tokio = { version = "1", features = ["full"] }
+r2d2_redis = "0.14.0"
+r2d2 = "0.8"
+log = "0.4"
+env_logger = "0.10"
+
+[dependencies.redis]
+version = "*"
