@@ -329,3 +329,5 @@ impl Blockchain {
         false
     }
 }
+
+//pegar endereços e chaves privadas válidas https://www.bitaddress.org/
