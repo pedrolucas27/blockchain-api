@@ -28,7 +28,7 @@ async fn main() -> std::io::Result<()> {
     */
     println!("Conexão com o Redis bem-sucedida!");
 
-    let blockchain_service = BlockchainService::new(pool.clone());
+    let blockchain_service = BlockchainService::new(pool);
 
     HttpServer::new(move || {
         App::new()

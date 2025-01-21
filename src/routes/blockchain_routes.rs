@@ -8,15 +8,18 @@ use actix_web::{get, post, web, HttpResponse, Responder};
 
 #[get("/chain")]
 async fn get_chain(service: web::Data<Mutex<BlockchainService>>) -> impl Responder {
-    println!("Processando chain...");
+    println!("Resgatando chain...");
 
-    let service = service.lock().unwrap();
-    let chain: Vec<Block> = service.current_blockchain.chain.clone();
+    let mut service = service.lock().unwrap();
+    let chain: Vec<Block> = service.get_chain();
+
     HttpResponse::Ok().json(chain)
 }
 
 #[post("/mine")]
 async fn mine_block(service: web::Data<Mutex<BlockchainService>>) -> impl Responder {
+    println!("Minerando bloco...");
+
     let mut service = service.lock().unwrap();
     match service.mine() {
         Ok(new_block) => HttpResponse::Ok().json(new_block),
@@ -28,8 +31,8 @@ async fn mine_block(service: web::Data<Mutex<BlockchainService>>) -> impl Respon
 
 #[get("/transactions/mempool")]
 async fn mempool(service: web::Data<Mutex<BlockchainService>>) -> impl Responder {
-    let service = service.lock().unwrap();
-    let mempool: Vec<Transaction> = service.current_blockchain.mempool.clone();
+    let mut service = service.lock().unwrap();
+    let mempool: Vec<Transaction> = service.get_mempool();
     HttpResponse::Ok().json(mempool)
 }
 
