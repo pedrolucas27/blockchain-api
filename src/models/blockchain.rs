@@ -30,7 +30,7 @@ pub struct Transaction {
     pub sender: String,
     pub recipient: String,
     pub amount: u64,
-    pub timestamp: String,
+    pub timestamp: u64,
     pub signature: Option<String>,
 }
 
@@ -39,7 +39,7 @@ pub struct TransactionRequest {
     pub sender: String,
     pub recipient: String,
     pub amount: u64,
-    pub timestamp: String,
+    pub timestamp: u64,
     pub priv_wif_key: String,
 }
 
