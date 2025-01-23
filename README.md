@@ -86,9 +86,10 @@ Adiciona uma nova transação ao mempool da blockchain.
   - Corpo (JSON):
     ```json
     {
-      "sender": "Alice",
-      "recipient": "Bob",
-      "amount": 15.0,
+      "sender": "Alice bitcoin address",
+      "recipient": "Bob bitcoin address",
+      "amount": 15,
+      "timestamp": 1737407999,
       "priv_wif_key": "private_key_example"
     }
     ```
